@@ -9,21 +9,58 @@ using Object = UnityEngine.Object;
 
 namespace BetterTransformInspector
 {
+    /// <summary>
+    /// Draws text fields to manipulate a <see cref="Transform"/> via an
+    /// extended expression engine
+    /// </summary>
     public class ExpressiveTransformEditor : IContext
     {
+        /// <summary>
+        /// Difference below which two numbers are considered equal
+        /// </summary>
         private const float DELTA = 0.0001f;
 
+        /// <summary>
+        /// Caches for expressions typed into the inspector. Each entry
+        /// corresponds to a value of <see cref="vectorIndex"/>.
+        /// </summary>
         private readonly string[] textX = new string[6];
         private readonly string[] textY = new string[6];
         private readonly string[] textZ = new string[6];
 
+        /// <summary>
+        /// Index of the currently processed Transform inside the list
+        /// of selected targets
+        /// </summary>
         private int selectionIndex;
+
+        /// <summary>
+        /// Index of the currently processed vector value:
+        /// 1 Local Position
+        /// 2 Local Rotation
+        /// 3 Local Scale
+        /// 4 Global Position
+        /// 5 Global Rotation
+        /// 6 Lossy Scale
+        /// </summary>
         private int vectorIndex;
+
+        /// <summary>
+        /// Transforms manipulated by this Editor
+        /// </summary>
         private Object[] targets;
+
+        /// <summary>
+        /// Initial values of each Transform when this Editor was created.
+        /// Each entry in the vector array corresponds to a value of
+        /// <see cref="vectorIndex"/>.
+        /// </summary>
         private List<Vector3[]> originals;
 
+        /// <summary>
+        /// The currently processed Transform
+        /// </summary>
         private Transform Current => (Transform)targets[selectionIndex];
-        private bool LocalVector => vectorIndex < 3;
 
         public ExpressiveTransformEditor()
         {
@@ -35,6 +72,9 @@ namespace BetterTransformInspector
             Undo.undoRedoPerformed -= Clear;
         }
 
+        /// <summary>
+        /// Clear cached values
+        /// </summary>
         public void Clear()
         {
             originals = null;
@@ -43,9 +83,18 @@ namespace BetterTransformInspector
             Array.Clear(textZ, 0, textZ.Length);
         }
 
-        public void OnInspectorGUI(Object[] targets)
+        /// <summary>
+        /// Must be called before the first call to Draw*Vectors()
+        /// </summary>
+        /// <param name="targets">
+        /// Transforms manipulated by this Editor
+        /// </param>
+        public void Initialize(Object[] targets)
         {
             this.targets = targets;
+
+            // Store initial values that variables and functions in
+            // expressions reference
             originals ??= targets
                 .Cast<Transform>()
                 .Select(x => new[]
@@ -60,6 +109,10 @@ namespace BetterTransformInspector
                 .ToList();
         }
 
+        /// <summary>
+        /// Draw a fake vector field for local position, rotation, and scale,
+        /// respectively
+        /// </summary>
         public void DrawLocalVectors()
         {
             vectorIndex = 0;
@@ -78,6 +131,10 @@ namespace BetterTransformInspector
                 setter: (t, v) => t.localScale = v);
         }
 
+        /// <summary>
+        /// Draw a fake vector field for global position, rotation, and scale,
+        /// respectively
+        /// </summary>
         public void DrawGlobalVectors()
         {
             vectorIndex = 3;
@@ -96,6 +153,16 @@ namespace BetterTransformInspector
                 setter: TransformEditor.SetLossyScale);
         }
 
+        /// <summary>
+        /// Draw three text fields that look like a vector field but can
+        /// actually process arbitrary text
+        /// </summary>
+        /// <param name="getter">
+        /// Function to get the vector to show from a Transform
+        /// </param>
+        /// <param name="setter">
+        /// Function to set the edited vector in a Transform
+        /// </param>
         private void DrawVector(
                 Func<Transform, Vector3> getter,
                 Action<Transform, Vector3> setter)
@@ -114,6 +181,7 @@ namespace BetterTransformInspector
                 sameZ &= Math.Abs(v.z - first.z) < DELTA;
             }
 
+            // Pick label for the fake vector field
             string label = vectorIndex switch
             {
                 0 or 3 => "Position",
@@ -125,36 +193,62 @@ namespace BetterTransformInspector
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(label, GUILayout.MinWidth(10));
 
-            Node nodeX = DrawTextField(sameX, first.x, "x", ref textX[vectorIndex]);
-            Node nodeY = DrawTextField(sameY, first.y, "y", ref textY[vectorIndex]);
-            Node nodeZ = DrawTextField(sameZ, first.z, "z", ref textZ[vectorIndex]);
+            Node nodeX = DrawTextField("x", first.x, sameX, ref textX[vectorIndex]);
+            Node nodeY = DrawTextField("y", first.y, sameY, ref textY[vectorIndex]);
+            Node nodeZ = DrawTextField("z", first.z, sameZ, ref textZ[vectorIndex]);
 
             EditorGUILayout.EndHorizontal();
 
+            // No text has been changed in the current frame. Nothing to do.
             if (nodeX == null && nodeY == null && nodeZ == null)
                 return;
 
+            // Create Undo step before manipulating Transforms
             Undo.RecordObjects(targets, "Set Transform");
+
             for (selectionIndex = 0; selectionIndex < targets.Length; selectionIndex++)
             {
                 Transform t = Current;
+
+                // Update the changed coordinate with the evaluated value and
+                // set the vector
                 Vector3 v = getter(t);
-                if (nodeX != null) v.x = Eval(nodeX);
-                if (nodeY != null) v.y = Eval(nodeY);
-                if (nodeZ != null) v.z = Eval(nodeZ);
+                if (nodeX != null) v.x = (float)nodeX.Eval(this);
+                if (nodeY != null) v.y = (float)nodeY.Eval(this);
+                if (nodeZ != null) v.z = (float)nodeZ.Eval(this);
                 setter(t, v);
             }
         }
 
-        private Node DrawTextField(bool same, float first, string varName, ref string text)
+        /// <summary>
+        /// Draw a text input field for a vector coordinate
+        /// </summary>
+        /// <param name="value">
+        /// Value of this coordinate
+        /// </param>
+        /// <param name="same">
+        /// True if all targets have the same value at this coordinate
+        /// </param>
+        /// <param name="text">
+        /// Expression typed into this field so far
+        /// </param>
+        /// <returns>
+        /// The tree of the parsed expression typed into the field.
+        /// Null when the expression couldn't be parsed or the text hasn't
+        /// been edited this frame.
+        /// </returns>
+        private Node DrawTextField(string label, float value, bool same, ref string text)
         {
+            /// Draw x/y/z label
             EditorGUILayout.LabelField(
-                label: varName.ToUpper(),
+                label: label.ToUpper(),
                 style: new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter },
                 options: GUILayout.MaxWidth(14));
 
+            /// If no text has been typed so far, insert the value if it is
+            /// equal for all targets, or a variable otherwise
             if (string.IsNullOrEmpty(text))
-                text = same ? first.ToString() : varName;
+                text = same ? value.ToString() : label;
 
             string newText = EditorGUILayout.TextField(text);
             if (newText == text)
@@ -172,24 +266,43 @@ namespace BetterTransformInspector
             }
         }
 
-        private float Eval(Node node) => (float)node.Eval(this);
-
+        /// <summary>
+        /// Get the value of a variable referring to a vector coordinate
+        /// </summary>
+        /// <param name="varName">
+        /// Name of the variable to resolve
+        /// </param>
+        /// <param name="objectIndex">
+        /// Index into the list of targets to get the object of which to
+        /// get the vector coordinate from.
+        /// </param>
         private float ResolveXYZ(string varName, int objectIndex)
         {
+            // Negative indices count from the back
             if (objectIndex < 0)
                 objectIndex += targets.Length;
 
+            // True when a local vector is requested
+            bool localVector = vectorIndex < 3;
+
+            // If variable starts with a special letter, then access position,
+            // rotation, or scale values directly. If not the currently edited
+            // vector is assumed.
             int vi = char.ToLower(varName[0]) switch
             {
-                'p' => LocalVector ? 0 : 3,
-                'r' => LocalVector ? 1 : 4,
-                's' => LocalVector ? 2 : 5,
+                'p' => localVector ? 0 : 3,
+                'r' => localVector ? 1 : 4,
+                's' => localVector ? 2 : 5,
                 _ => vectorIndex,
             };
 
             char last = varName[varName.Length - 1];
+
+            // Upper characters switch the space: access global values in
+            // local inspector fields and local values in global inspector
+            // fields
             if (char.IsUpper(last))
-                vi += LocalVector ? 3 : -3;
+                vi += localVector ? 3 : -3;
 
             Vector3 v = originals[objectIndex][vi];
 
@@ -202,6 +315,7 @@ namespace BetterTransformInspector
             };
         }
 
+        /// <inheritdoc cref="IContext.ResolveVariable"/>
         public double ResolveVariable(string name)
         {
             return name switch
@@ -217,6 +331,7 @@ namespace BetterTransformInspector
             };
         }
 
+        /// <inheritdoc cref="IContext.CallFunction"/>
         public double CallFunction(string name, double[] args)
         {
             return name switch
