@@ -1,13 +1,12 @@
-This is a Unity add-on to improve the Inspector of Transform components. It
+This is a Unity package to improve the Inspector of Transform components. It
 integrates a powerful expression engine that gives you more control over
-every selected object. For example, now you can:
-
-- Add to each object's current x position
-- Separate objects by a uniform distance
-- Swap x and y rotations
-- Place objects in a circle
-- Scale objects randomly
-- And much more...
+every selected object. Now you can for example:
+* Add to each object's current x-position
+* Separate objects by a uniform distance
+* Swap x and y rotations
+* Arrange objects in a circle
+* Scale objects randomly
+* And much more...
 
 
 # Installation
@@ -21,19 +20,29 @@ Alternatively, you can:
 * In Unity, go to `Window` > `Package Manager` > `+` > `Add Package from disk`
 * Select `package.json` at the root of the package folder
 
-Unity should automatically load the add-on. After the successful installation
-you should already see additional input fields for world space coordinates in
-the inspector of a Transform component. The expression engine needs to be
-manually activated, though. To do so, open the context menu of a Transform
-component and click `Enable Expressions`.
+Unity should automatically load the package. After the successful installation
+you should see additional input fields for world space coordinates in
+the inspector of a Transform component.
 
 
 # Usage
 
-The add-on defines various variables and functions to be used in the
-inspector's input fields. What follows is a comprehensive list of these
-variables and functions. Of course the infix operators `+-*/` for addition,
-subtraction, multiplication, and division are also supported.
+The Inspector accepting extended expressions, named the Expressive Inspector,
+works a bit differently from the default Transform Inspector. To support value
+swapping and ease formula editing, the shown values are not updated by other
+operations manipulating the respective Transform, such as scene gizmos. As
+soon as the Inspector is shown, the initial transformation is stored for any
+variable or function to reference it.
+
+Because this behaviour is unfavorable in most situations, the Expressive
+Inspector must be activated manually via the context menu of a Transform
+component. To refresh the stored transformation, change the selection or
+toggle the Expressive Inspector via this menu.
+
+What follows is a comprehensive list of variables and functions that can be
+used with the Expressive Inspector. Of course the standard infix operators
+`+-*/` for addition, subtraction, multiplication, and division are also
+supported.
 
 
 ### Variables
@@ -51,8 +60,6 @@ subtraction, multiplication, and division are also supported.
 | r | [Random value](https://docs.unity3d.com/ScriptReference/Random-value.html) in the range [0, 1] |
 | pi | [pi](https://learn.microsoft.com/en-us/dotnet/api/system.math.pi) constant |
 | e | [e](https://learn.microsoft.com/en-us/dotnet/api/system.math.e) constant |
-
-\* Lowercase x, y, z returns the local coordinate, whereas the uppercase character returns the global coordinate.
 
 
 ### Functions
@@ -78,9 +85,9 @@ subtraction, multiplication, and division are also supported.
 | ceil(x) | [Rounded up value](https://learn.microsoft.com/en-us/dotnet/api/system.math.ceiling) of x |
 | clamp(x, a, b) | x clamped to range [a, b] |
 | quant(x, y) | Quantize: largest multiple of y <= x |
-| min(...) | [Minimum](https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.min) of every passed argument |
-| max(...) | [Maximum](https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.max) of every passed argument |
-| avg(...) | [Average](https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.average) of every passed argument |
+| min(...) | [Minimum](https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.min) of all passed arguments |
+| max(...) | [Maximum](https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.max) of all passed arguments |
+| avg(...) | [Average](https://learn.microsoft.com/en-us/dotnet/api/system.linq.enumerable.average) of all passed arguments |
 | sin(x) | [Sine](https://learn.microsoft.com/en-us/dotnet/api/system.math.sin) of x |
 | cos(x) | [Cosine](https://learn.microsoft.com/en-us/dotnet/api/system.math.cos) of x |
 | tan(x) | [Tangent](https://learn.microsoft.com/en-us/dotnet/api/system.math.tan) of x |
@@ -90,4 +97,8 @@ subtraction, multiplication, and division are also supported.
 | pyth(a, b) | [Pythagorean equation](https://en.wikipedia.org/wiki/Pythagorean_theorem): sqrt(a * a + b * b) |
 | rand(a, b) | [Random value](https://docs.unity3d.com/ScriptReference/Random.Range.html) in the range [a, b] |
 
-\* Lowercase x, y, z returns the local coordinate, whereas the uppercase character returns the global coordinate.
+\* Lower case x, y, z returns the local coordinate in the local space Inspector
+and the global coordinate in the world space Inspector. An upper case character
+returns the coordinate from the other space respectively.
+
+

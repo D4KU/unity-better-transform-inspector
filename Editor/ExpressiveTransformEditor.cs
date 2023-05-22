@@ -11,23 +11,33 @@ namespace BetterTransformInspector
 {
     public class ExpressiveTransformEditor : IContext
     {
-        private readonly string[] textX = new string[3];
-        private readonly string[] textY = new string[3];
-        private readonly string[] textZ = new string[3];
+        private const float DELTA = 0.0001f;
+
+        private readonly string[] textX = new string[6];
+        private readonly string[] textY = new string[6];
+        private readonly string[] textZ = new string[6];
 
         private int selectionIndex;
-        private int transformIndex;
-        private List<Vector3[]> originals;
+        private int vectorIndex;
         private Object[] targets;
-        private Dictionary<Transform, Vector3[]> dict;
+        private List<Vector3[]> originals;
 
         private Transform Current => (Transform)targets[selectionIndex];
+        private bool LocalVector => vectorIndex < 3;
 
-        public ExpressiveTransformEditor() => Undo.undoRedoPerformed += OnUndo;
-        ~ExpressiveTransformEditor() => Undo.undoRedoPerformed -= OnUndo;
-
-        private void OnUndo()
+        public ExpressiveTransformEditor()
         {
+            Undo.undoRedoPerformed += Clear;
+        }
+
+        ~ExpressiveTransformEditor()
+        {
+            Undo.undoRedoPerformed -= Clear;
+        }
+
+        public void Clear()
+        {
+            originals = null;
             Array.Clear(textX, 0, textX.Length);
             Array.Clear(textY, 0, textY.Length);
             Array.Clear(textZ, 0, textZ.Length);
@@ -48,30 +58,47 @@ namespace BetterTransformInspector
                     x.lossyScale,
                 })
                 .ToList();
+        }
 
-            transformIndex = 0;
+        public void DrawLocalVectors()
+        {
+            vectorIndex = 0;
             DrawVector(
                 getter: t => t.localPosition,
-                setter: (t, v) => t.localPosition = v,
-                label: "Position");
+                setter: (t, v) => t.localPosition = v);
 
-            transformIndex = 1;
+            vectorIndex = 1;
             DrawVector(
                 getter: t => t.localEulerAngles,
-                setter: (t, v) => t.localEulerAngles = v,
-                label: "Rotation");
+                setter: (t, v) => t.localEulerAngles = v);
 
-            transformIndex = 2;
+            vectorIndex = 2;
             DrawVector(
                 getter: t => t.localScale,
-                setter: (t, v) => t.localScale = v,
-                label: "Scale");
+                setter: (t, v) => t.localScale = v);
+        }
+
+        public void DrawGlobalVectors()
+        {
+            vectorIndex = 3;
+            DrawVector(
+                getter: t => t.position,
+                setter: (t, v) => t.position = v);
+
+            vectorIndex = 4;
+            DrawVector(
+                getter: t => t.eulerAngles,
+                setter: (t, v) => t.eulerAngles = v);
+
+            vectorIndex = 5;
+            DrawVector(
+                getter: t => t.lossyScale,
+                setter: TransformEditor.SetLossyScale);
         }
 
         private void DrawVector(
                 Func<Transform, Vector3> getter,
-                Action<Transform, Vector3> setter,
-                string label)
+                Action<Transform, Vector3> setter)
         {
             IEnumerable<Vector3> vectors = targets.Cast<Transform>().Select(getter);
             Vector3 first = vectors.First();
@@ -82,17 +109,25 @@ namespace BetterTransformInspector
 
             foreach (Vector3 v in vectors.Skip(1))
             {
-                sameX &= v.x == first.x;
-                sameY &= v.y == first.y;
-                sameZ &= v.z == first.z;
+                sameX &= Math.Abs(v.x - first.x) < DELTA;
+                sameY &= Math.Abs(v.y - first.y) < DELTA;
+                sameZ &= Math.Abs(v.z - first.z) < DELTA;
             }
+
+            string label = vectorIndex switch
+            {
+                0 or 3 => "Position",
+                1 or 4 => "Rotation",
+                2 or 5 => "Scale",
+                _ => string.Empty,
+            };
 
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(label, GUILayout.MinWidth(10));
 
-            Node nodeX = DrawTextField(sameX, first.x, "x", ref textX[transformIndex]);
-            Node nodeY = DrawTextField(sameY, first.y, "y", ref textY[transformIndex]);
-            Node nodeZ = DrawTextField(sameZ, first.z, "z", ref textZ[transformIndex]);
+            Node nodeX = DrawTextField(sameX, first.x, "x", ref textX[vectorIndex]);
+            Node nodeY = DrawTextField(sameY, first.y, "y", ref textY[vectorIndex]);
+            Node nodeZ = DrawTextField(sameZ, first.z, "z", ref textZ[vectorIndex]);
 
             EditorGUILayout.EndHorizontal();
 
@@ -129,7 +164,7 @@ namespace BetterTransformInspector
 
             try
             {
-                return Parser.Parse(text);
+                return Parser.Parse(newText);
             }
             catch
             {
@@ -144,19 +179,19 @@ namespace BetterTransformInspector
             if (objectIndex < 0)
                 objectIndex += targets.Length;
 
-            int ti = char.ToLower(varName[0]) switch
+            int vi = char.ToLower(varName[0]) switch
             {
-                'p' => 0,
-                'r' => 1,
-                's' => 2,
-                _ => transformIndex,
+                'p' => LocalVector ? 0 : 3,
+                'r' => LocalVector ? 1 : 4,
+                's' => LocalVector ? 2 : 5,
+                _ => vectorIndex,
             };
 
             char last = varName[varName.Length - 1];
             if (char.IsUpper(last))
-                ti += 3;
+                vi += LocalVector ? 3 : -3;
 
-            Vector3 v = originals[objectIndex][ti];
+            Vector3 v = originals[objectIndex][vi];
 
             return char.ToLower(last) switch
             {
