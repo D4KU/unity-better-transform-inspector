@@ -1,0 +1,18 @@
+{
+    "name": "BetterTransformInspector",
+    "rootNamespace": "",
+    "references": [
+        "GUID:615afb3acb94f3844bb5a25fa70035c8"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

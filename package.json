@@ -1,0 +1,7 @@
+{
+  "name": "com.d4ku.better-transform-inspector",
+  "version": "0.1.0",
+  "displayName": "Better Transform Inspector",
+  "description": "Improve the Inspector for Transform components",
+  "type": "tool"
+}
