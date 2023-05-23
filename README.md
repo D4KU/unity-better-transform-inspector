@@ -1,9 +1,16 @@
-This is a Unity package to improve the Inspector of Transform components. It
-integrates a powerful expression engine that gives you more control over
-every selected object. Now you can for example:
+<div align="center">
+
+![](https://github.com/D4KU/unity-better-transform-inspector/blob/main/Media%7E/BetterTransformInspector.gif)
+
+</div>
+
+This Unity package improves the Inspector of Transform components by
+integrating a powerful expression engine that gives you more control over
+selected objects. Now you can for example:
+
 * Add to each object's current x-position
 * Separate objects by a uniform distance
-* Swap x and y rotations
+* Swap x- and y-rotations
 * Arrange objects in a circle
 * Scale objects randomly
 * And much more...
