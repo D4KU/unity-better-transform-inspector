@@ -29,6 +29,14 @@ namespace BetterTransformInspector
         private readonly string[] textZ = new string[6];
 
         /// <summary>
+        /// Syntax errors to show as tooltips next to input fields.
+        /// Each entry corresponds to a value of <see cref="vectorIndex"/>.
+        /// </summary>
+        private readonly string[] errorX = new string[6];
+        private readonly string[] errorY = new string[6];
+        private readonly string[] errorZ = new string[6];
+
+        /// <summary>
         /// Index of the currently processed Transform inside the list
         /// of selected targets
         /// </summary>
@@ -193,9 +201,9 @@ namespace BetterTransformInspector
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(label, GUILayout.MinWidth(10));
 
-            Node nodeX = DrawTextField("x", first.x, sameX, ref textX[vectorIndex]);
-            Node nodeY = DrawTextField("y", first.y, sameY, ref textY[vectorIndex]);
-            Node nodeZ = DrawTextField("z", first.z, sameZ, ref textZ[vectorIndex]);
+            Node nodeX = DrawTextField("x", first.x, sameX, ref textX[vectorIndex], ref errorX[vectorIndex]);
+            Node nodeY = DrawTextField("y", first.y, sameY, ref textY[vectorIndex], ref errorY[vectorIndex]);
+            Node nodeZ = DrawTextField("z", first.z, sameZ, ref textZ[vectorIndex], ref errorZ[vectorIndex]);
 
             EditorGUILayout.EndHorizontal();
 
@@ -213,10 +221,30 @@ namespace BetterTransformInspector
                 // Update the changed coordinate with the evaluated value and
                 // set the vector
                 Vector3 v = getter(t);
-                if (nodeX != null) v.x = (float)nodeX.Eval(this);
-                if (nodeY != null) v.y = (float)nodeY.Eval(this);
-                if (nodeZ != null) v.z = (float)nodeZ.Eval(this);
+                EvalAndAssign(nodeX, ref v.x, ref errorX[vectorIndex]);
+                EvalAndAssign(nodeY, ref v.y, ref errorY[vectorIndex]);
+                EvalAndAssign(nodeZ, ref v.z, ref errorZ[vectorIndex]);
                 setter(t, v);
+            }
+        }
+
+        /// <summary>
+        /// If the given expression node could be evaluated, assign the
+        /// returned value to the given output.
+        /// </summary>
+        private void EvalAndAssign(Node node, ref float output, ref string error)
+        {
+            if (node == null)
+                return;
+
+            try
+            {
+                output = (float)node.Eval(this);
+                error = null;
+            }
+            catch (SyntaxException e)
+            {
+                error = e.Message;
             }
         }
 
@@ -237,16 +265,26 @@ namespace BetterTransformInspector
         /// Null when the expression couldn't be parsed or the text hasn't
         /// been edited this frame.
         /// </returns>
-        private Node DrawTextField(string label, float value, bool same, ref string text)
+        private Node DrawTextField(string label, float value, bool same, ref string text, ref string error)
         {
-            /// Draw x/y/z label
+            GUIStyle style = new(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
+
+            // Choose label color
+            style.normal.textColor = string.IsNullOrEmpty(error)
+                ? GUI.skin.label.normal.textColor
+                : new(.82f, .13f, .13f);
+
+            // Draw x/y/z label
             EditorGUILayout.LabelField(
-                label: label.ToUpper(),
-                style: new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter },
+                label: new GUIContent(label.ToUpper(), error),
+                style: style,
                 options: GUILayout.MaxWidth(14));
 
-            /// If no text has been typed so far, insert the value if it is
-            /// equal for all targets, or a variable otherwise
+            // If no text has been typed so far, insert the value if it is
+            // equal for all targets, or a variable otherwise
             if (string.IsNullOrEmpty(text))
                 text = same ? value.ToString() : label;
 
@@ -260,8 +298,9 @@ namespace BetterTransformInspector
             {
                 return Parser.Parse(newText);
             }
-            catch
+            catch (SyntaxException e)
             {
+                error = e.Message;
                 return null;
             }
         }
@@ -311,7 +350,7 @@ namespace BetterTransformInspector
                 'x' => v.x,
                 'y' => v.y,
                 'z' => v.z,
-                _ => throw new ArgumentException(),
+                _ => throw new SyntaxException($"Unrecognized token: {varName}"),
             };
         }
 
