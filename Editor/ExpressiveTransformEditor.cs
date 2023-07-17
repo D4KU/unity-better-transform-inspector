@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Random = UnityEngine.Random;
 using Object = UnityEngine.Object;
+using System.Text.RegularExpressions;
 
 namespace BetterTransformInspector
 {
@@ -301,8 +302,28 @@ namespace BetterTransformInspector
             catch (SyntaxException e)
             {
                 error = e.Message;
-                return null;
             }
+            catch (FormatException e)
+            {
+                error = e.Message;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Return the number at the end of an object's name
+        /// </summary>
+        /// <exception cref="SyntaxException">If parsing failed</exception>
+        private int ParseNumberSuffix(string name)
+        {
+            // Match last (first from right) occurrence of integer with
+            // optional sign
+            Match match = Regex.Match(name, @"-?\d+", RegexOptions.RightToLeft);
+            if (int.TryParse(match.Value, out int i))
+                return i;
+
+            throw new SyntaxException($"No integer found in '{name}'");
         }
 
         /// <summary>
@@ -363,6 +384,7 @@ namespace BetterTransformInspector
                 "l" => targets.Length,
                 "j" => Current.GetSiblingIndex(),
                 "c" => Current.childCount,
+                "n" => ParseNumberSuffix(Current.name),
                 "e" => Math.E,
                 "pi" => Math.PI,
                 "r" => Random.value,

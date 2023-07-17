@@ -62,6 +62,7 @@ supported.
 | sx/sy/sz | x/y/z-coordinate of the object's scale * |
 | i | The object's index in the list of selected objects |
 | j | The object's [sibling index](https://docs.unity3d.com/ScriptReference/Transform.GetSiblingIndex.html) |
+| n | The object's number suffix (e.g. *1* in *GameObject (1)*) |
 | l | The number of selected objects |
 | c | The object's [child count](https://docs.unity3d.com/ScriptReference/Transform-childCount.html) |
 | r | [Random value](https://docs.unity3d.com/ScriptReference/Random-value.html) in the range [0, 1] |
