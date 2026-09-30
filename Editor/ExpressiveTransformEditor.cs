@@ -44,6 +44,12 @@ namespace BetterTransformInspector
         private int selectionIndex;
 
         /// <summary>
+        /// The rank of the currently processed Transform based on the visual
+        /// order in the hierarchy
+        /// </summary>
+        private int hierarchyIndex;
+
+        /// <summary>
         /// Index of the currently processed vector value:
         /// 1 Local Position
         /// 2 Local Rotation
@@ -215,9 +221,14 @@ namespace BetterTransformInspector
             // Create Undo step before manipulating Transforms
             Undo.RecordObjects(targets, "Set Transform");
 
+            // Sort a copy of the targets by their real hierarchy position to correctly calculate 'i'
+            var sortedTargets = targets.Cast<Transform>().ToList();
+            sortedTargets.Sort(CompareHierarchy);
+
             for (selectionIndex = 0; selectionIndex < targets.Length; selectionIndex++)
             {
                 Transform t = Current;
+                hierarchyIndex = sortedTargets.IndexOf(t);
 
                 // Update the changed coordinate with the evaluated value and
                 // set the vector
@@ -227,6 +238,43 @@ namespace BetterTransformInspector
                 EvalAndAssign(nodeZ, ref v.z, ref errorZ[vectorIndex]);
                 setter(t, v);
             }
+        }
+
+        /// <summary>
+        /// Compare two Transforms based on their visual top-to-bottom position in the hierarchy
+        /// </summary>
+        private static int CompareHierarchy(Transform a, Transform b)
+        {
+            if (a == b)
+                return 0;
+
+            // Optimization for siblings
+            if (a.parent == b.parent)
+                return a.GetSiblingIndex().CompareTo(b.GetSiblingIndex());
+
+            // Build paths from target up to the root
+            var pathA = new List<int>();
+            for (Transform t = a; t != null; t = t.parent)
+                pathA.Add(t.GetSiblingIndex());
+
+            var pathB = new List<int>();
+            for (Transform t = b; t != null; t = t.parent)
+                pathB.Add(t.GetSiblingIndex());
+
+            // Traverse down from root to leaf to find where the paths diverge
+            int iA = pathA.Count - 1;
+            int iB = pathB.Count - 1;
+
+            while (iA >= 0 && iB >= 0)
+            {
+                if (pathA[iA] != pathB[iB])
+                    return pathA[iA].CompareTo(pathB[iB]);
+                iA--;
+                iB--;
+            }
+
+            // If one path is fully contained within the other, the shorter path (the parent) comes first
+            return pathA.Count.CompareTo(pathB.Count);
         }
 
         /// <summary>
@@ -380,7 +428,7 @@ namespace BetterTransformInspector
         {
             return name switch
             {
-                "i" => selectionIndex,
+                "i" => hierarchyIndex,
                 "l" => targets.Length,
                 "j" => Current.GetSiblingIndex(),
                 "c" => Current.childCount,
@@ -426,4 +474,3 @@ namespace BetterTransformInspector
         }
     }
 }
-
